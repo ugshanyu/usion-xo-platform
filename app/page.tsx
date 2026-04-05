@@ -395,7 +395,7 @@ export default function XO8x8() {
         <div id="gameBoard" className="game-board"></div>
       </div>
 
-      <Script src="/usion-sdk.js" strategy="beforeInteractive" />
+      <Script src="https://usions.com/usion-sdk.js" strategy="beforeInteractive" />
       <Script id="game-logic" strategy="afterInteractive">{`
         var COLS = 8;
         var ROWS = 8;

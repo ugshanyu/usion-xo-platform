@@ -56,12 +56,14 @@ The service config should include:
 }
 ```
 
-## SDK files
+## SDK
 
-- `public/usion-sdk.js` — Usion game SDK
-- `public/usion-design-system.css` — Usion design system
+This example loads the Usion SDK and Design System directly from the CDN:
 
-Get the latest versions from the [Usion shared assets](https://github.com/ugshanyu/usion-xo-platform).
+- `https://usions.com/usion-sdk.js` — Usion game SDK
+- `https://usions.com/usion-design-system.css` — Usion design system
+
+You can also install via npm: `npm install @usions/sdk`
 
 ## License
 
