@@ -72,6 +72,7 @@ export function initGame() {
     winner: null as string | null,
     winningCells: [] as number[],
     isProcessing: false,
+    rematchRequested: false,
   };
 
   const elements = {
@@ -205,6 +206,22 @@ export function initGame() {
     }
 
     elements.gameOverOverlay.classList.remove('hidden');
+  }
+
+  // Reset game state for rematch
+  function resetGame() {
+    state.gameOver = false;
+    state.winner = null;
+    state.winningCells = [];
+    state.status = 'playing';
+    state.isProcessing = false;
+    state.rematchRequested = false;
+    state.board = new Array(TOTAL_CELLS).fill('');
+    state.currentTurn = state.playerIds[0]; // Host always goes first
+
+    elements.gameOverOverlay.classList.add('hidden');
+    updateBoard();
+    updateGameStatus();
   }
 
   // Transition from waiting → playing when conditions are met
@@ -363,17 +380,11 @@ export function initGame() {
   });
 
   Usion.game.onGameRestarted((data: any) => {
-    state.gameOver = false;
-    state.winner = null;
-    state.winningCells = [];
-    state.status = 'playing';
-    state.isProcessing = false;
-    state.board = data.game_state ? data.game_state.board : new Array(TOTAL_CELLS).fill('');
-    state.currentTurn = data.current_turn;
-
-    elements.gameOverOverlay.classList.add('hidden');
-    updateBoard();
-    updateGameStatus();
+    if (data.game_state) {
+      state.board = data.game_state.board || new Array(TOTAL_CELLS).fill('');
+    }
+    if (data.current_turn) state.currentTurn = data.current_turn;
+    resetGame();
   });
 
   Usion.game.onPlayerLeft((data: any) => {
@@ -513,13 +524,22 @@ export function initGame() {
 
   // --- Rematch / Exit ---
   elements.rematchBtn.addEventListener('click', () => {
+    state.rematchRequested = true;
     Usion.game.requestRematch();
-    elements.rematchBtn.textContent = 'Starting...';
+    elements.rematchBtn.textContent = 'Waiting...';
     elements.rematchBtn.disabled = true;
-    setTimeout(() => {
-      elements.rematchBtn.textContent = 'Rematch';
+  });
+
+  // Handle rematch request from opponent
+  Usion.game.onRematchRequest(() => {
+    if (state.rematchRequested) {
+      // Both players agreed — restart
+      resetGame();
+    } else {
+      // Opponent wants rematch — update button text
+      elements.rematchBtn.textContent = 'Accept Rematch';
       elements.rematchBtn.disabled = false;
-    }, 5000);
+    }
   });
 
   elements.exitBtn.addEventListener('click', () => {
