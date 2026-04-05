@@ -252,8 +252,9 @@ export function initGame() {
       updateBoard();
       updateGameStatus();
 
-      if (state.status === 'playing' && state.playerIds.length >= 2) {
+      if (state.playerIds.length >= 2) {
         elements.waitingOverlay.classList.add('hidden');
+        if (state.status === 'waiting') state.status = 'playing';
       }
 
       if (state.gameOver) {
@@ -311,8 +312,16 @@ export function initGame() {
     if (data.game_state) {
       state.board = data.game_state.board || state.board;
     }
+    if (data.player_ids) state.playerIds = data.player_ids;
     state.currentTurn = data.current_turn;
     if (data.status) state.status = data.status;
+
+    // Hide waiting overlay when game becomes active
+    if (state.status === 'playing' || state.playerIds.length >= 2) {
+      elements.waitingOverlay.classList.add('hidden');
+      if (state.status === 'waiting') state.status = 'playing';
+      updatePlayerInfo();
+    }
 
     const winResult = findWinner(state.board);
     if (winResult) state.winningCells = winResult.cells;
