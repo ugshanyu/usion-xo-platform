@@ -164,6 +164,8 @@ export function initGame() {
 
     if (state.status === 'waiting') {
       statusEl.textContent = 'Waiting for opponent...';
+    } else if (state.status === 'waiting_rejoin') {
+      statusEl.textContent = 'Opponent left. Waiting...';
     } else if (state.gameOver) {
       statusEl.textContent = '';
     } else if (state.isProcessing) {
@@ -226,10 +228,12 @@ export function initGame() {
     updateGameStatus();
   }
 
-  // Transition from waiting → playing when conditions are met
+  // Transition from waiting/waiting_rejoin → playing when conditions are met
   function tryStartGame() {
     if (state.gameOver) return;
     if (state.playerIds.length < 2) return;
+
+    const wasWaitingRejoin = state.status === 'waiting_rejoin';
 
     // Start the game
     state.status = 'playing';
@@ -238,6 +242,14 @@ export function initGame() {
     }
     if (!state.playerSymbol) {
       state.playerSymbol = state.playerIds[0] === state.playerId ? 'X' : 'O';
+    }
+
+    // Restore waiting overlay text for next time
+    if (wasWaitingRejoin) {
+      const waitingText = document.querySelector('.waiting-text') as HTMLElement;
+      const waitingSubtext = document.querySelector('.waiting-subtext') as HTMLElement;
+      if (waitingText) waitingText.textContent = 'Waiting for opponent...';
+      if (waitingSubtext) waitingSubtext.textContent = 'Share this game with a friend';
     }
 
     elements.waitingOverlay.classList.add('hidden');
@@ -334,6 +346,7 @@ export function initGame() {
     if (data.current_turn) state.currentTurn = data.current_turn;
     if (data.status) state.status = data.status;
 
+    // If rejoining mid-game, keep status as waiting_rejoin so tryStartGame handles it
     updatePlayerInfo();
     tryStartGame();
   });
@@ -390,21 +403,27 @@ export function initGame() {
   });
 
   Usion.game.onPlayerLeft((data: any) => {
-    const hasMovesBeenMade = state.board.some((cell: string) => cell !== '');
-    if (!state.gameOver && state.status === 'playing' && hasMovesBeenMade) {
-      state.gameOver = true;
-      state.winner = state.playerId;
-      showGameOver({ winner_ids: [state.playerId], reason: 'forfeit' });
-    } else if (!state.gameOver && !hasMovesBeenMade) {
-      // Player left before game started — go back to waiting
-      state.status = 'waiting';
-      if (data.player_id) {
-        state.playerIds = state.playerIds.filter((id: string) => id !== data.player_id);
-      }
-      elements.waitingOverlay.classList.remove('hidden');
-      updatePlayerInfo();
-      updateGameStatus();
+    if (state.gameOver) return;
+
+    // Remove departed player from playerIds
+    if (data.player_id) {
+      state.playerIds = state.playerIds.filter((id: string) => id !== data.player_id);
     }
+
+    // If it was the departed player's turn, give turn to remaining player
+    if (data.player_id && state.currentTurn === data.player_id) {
+      state.currentTurn = state.playerId;
+    }
+
+    // Go to waiting state — keep board intact for rejoin
+    state.status = 'waiting_rejoin';
+    const waitingText = document.querySelector('.waiting-text') as HTMLElement;
+    const waitingSubtext = document.querySelector('.waiting-subtext') as HTMLElement;
+    if (waitingText) waitingText.textContent = 'Opponent left';
+    if (waitingSubtext) waitingSubtext.textContent = 'Waiting for another player...';
+    elements.waitingOverlay.classList.remove('hidden');
+    updatePlayerInfo();
+    updateGameStatus();
   });
 
   // Handle opponent's moves (Platform mode: backend relays game:action between clients)
