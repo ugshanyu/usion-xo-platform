@@ -74,6 +74,7 @@ export function initGame() {
     isProcessing: false,
     rematchRequested: false,
     opponentWantsRematch: false,
+    _exitedPlayerHadTurn: false,
   };
 
   const elements = {
@@ -220,6 +221,7 @@ export function initGame() {
     state.isProcessing = false;
     state.rematchRequested = false;
     state.opponentWantsRematch = false;
+    state._exitedPlayerHadTurn = false;
     state.board = new Array(TOTAL_CELLS).fill('');
     state.currentTurn = state.playerIds[0]; // Host always goes first
 
@@ -351,9 +353,20 @@ export function initGame() {
     // If a new player joined while we have board state, sync it to them
     const hasBoardState = state.board.some((cell: string) => cell !== '');
     if (hasBoardState && state.playerIds.length >= 2) {
+      // If the exited player had the turn, assign it to the new player
+      let syncTurn = state.currentTurn;
+      if (state._exitedPlayerHadTurn) {
+        const newPlayerId = state.playerIds.find((id: string) => id !== state.playerId);
+        if (newPlayerId) {
+          syncTurn = newPlayerId;
+          state.currentTurn = newPlayerId; // Update locally too
+        }
+        state._exitedPlayerHadTurn = false;
+      }
+
       Usion.game.action('sync_state', {
         board: state.board,
-        currentTurn: state.currentTurn,
+        currentTurn: syncTurn,
       });
     }
 
@@ -414,14 +427,19 @@ export function initGame() {
   Usion.game.onPlayerLeft((data: any) => {
     if (state.gameOver) return;
 
+    // Track whether the exited player had the turn (before removing them)
+    const exitedPlayerHadTurn = data.player_id && state.currentTurn === data.player_id;
+
     // Remove departed player from playerIds
     if (data.player_id) {
       state.playerIds = state.playerIds.filter((id: string) => id !== data.player_id);
     }
 
-    // If it was the departed player's turn, give turn to remaining player
-    if (data.player_id && state.currentTurn === data.player_id) {
-      state.currentTurn = state.playerId;
+    // Keep currentTurn as-is if it's the remaining player's turn.
+    // If exited player had the turn, store a flag so we can give it to the new player on rejoin.
+    state._exitedPlayerHadTurn = exitedPlayerHadTurn;
+    if (exitedPlayerHadTurn) {
+      state.currentTurn = null; // Will be assigned to new player on rejoin
     }
 
     // Go to waiting state — keep board intact for rejoin
