@@ -346,8 +346,17 @@ export function initGame() {
     if (data.current_turn) state.currentTurn = data.current_turn;
     if (data.status) state.status = data.status;
 
-    // If rejoining mid-game, keep status as waiting_rejoin so tryStartGame handles it
     updatePlayerInfo();
+
+    // If a new player joined while we have board state, sync it to them
+    const hasBoardState = state.board.some((cell: string) => cell !== '');
+    if (hasBoardState && state.playerIds.length >= 2) {
+      Usion.game.action('sync_state', {
+        board: state.board,
+        currentTurn: state.currentTurn,
+      });
+    }
+
     tryStartGame();
   });
 
@@ -430,6 +439,15 @@ export function initGame() {
   Usion.game.onAction((data: any) => {
     const actionType = data.action_type;
     const actionData = data.action_data || {};
+
+    // Sync full board state from the other player (rejoin scenario)
+    if (actionType === 'sync_state' && actionData.board) {
+      state.board = actionData.board;
+      if (actionData.currentTurn) state.currentTurn = actionData.currentTurn;
+      updateBoard();
+      updateGameStatus();
+      return;
+    }
 
     if (actionType === 'move' && actionData.index !== undefined) {
       const index = actionData.index;
