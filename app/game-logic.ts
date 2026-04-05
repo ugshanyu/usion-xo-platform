@@ -73,6 +73,7 @@ export function initGame() {
     winningCells: [] as number[],
     isProcessing: false,
     rematchRequested: false,
+    opponentWantsRematch: false,
   };
 
   const elements = {
@@ -216,6 +217,7 @@ export function initGame() {
     state.status = 'playing';
     state.isProcessing = false;
     state.rematchRequested = false;
+    state.opponentWantsRematch = false;
     state.board = new Array(TOTAL_CELLS).fill('');
     state.currentTurn = state.playerIds[0]; // Host always goes first
 
@@ -526,17 +528,24 @@ export function initGame() {
   elements.rematchBtn.addEventListener('click', () => {
     state.rematchRequested = true;
     Usion.game.requestRematch();
-    elements.rematchBtn.textContent = 'Waiting...';
-    elements.rematchBtn.disabled = true;
+
+    if (state.opponentWantsRematch) {
+      // Both agreed — reset immediately
+      resetGame();
+    } else {
+      elements.rematchBtn.textContent = 'Waiting...';
+      elements.rematchBtn.disabled = true;
+    }
   });
 
   // Handle rematch request from opponent
   Usion.game.onRematchRequest(() => {
+    state.opponentWantsRematch = true;
     if (state.rematchRequested) {
-      // Both players agreed — restart
+      // Both agreed — restart
       resetGame();
     } else {
-      // Opponent wants rematch — update button text
+      // Opponent wants rematch — update button
       elements.rematchBtn.textContent = 'Accept Rematch';
       elements.rematchBtn.disabled = false;
     }
