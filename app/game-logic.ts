@@ -207,6 +207,25 @@ export function initGame() {
     elements.gameOverOverlay.classList.remove('hidden');
   }
 
+  // Transition from waiting → playing when conditions are met
+  function tryStartGame() {
+    if (state.gameOver) return;
+    if (state.playerIds.length < 2) return;
+
+    // Start the game
+    state.status = 'playing';
+    if (!state.currentTurn) {
+      state.currentTurn = state.playerIds[0]; // Host goes first
+    }
+    if (!state.playerSymbol) {
+      state.playerSymbol = state.playerIds[0] === state.playerId ? 'X' : 'O';
+    }
+
+    elements.waitingOverlay.classList.add('hidden');
+    updatePlayerInfo();
+    updateGameStatus();
+  }
+
   // --- SDK initialization ---
   function connectToGame() {
     if (!state.roomId) {
@@ -252,8 +271,9 @@ export function initGame() {
       updateBoard();
       updateGameStatus();
 
-      if (state.status === 'playing' && state.playerIds.length >= 2) {
-        elements.waitingOverlay.classList.add('hidden');
+      // If both players already matched, start the game
+      if (state.playerIds.length >= 2 || state.status === 'playing') {
+        tryStartGame();
       }
 
       if (state.gameOver) {
@@ -296,13 +316,7 @@ export function initGame() {
     if (data.status) state.status = data.status;
 
     updatePlayerInfo();
-
-    if (state.playerIds.length >= 2) {
-      if (state.status === 'playing') {
-        elements.waitingOverlay.classList.add('hidden');
-      }
-      updateGameStatus();
-    }
+    tryStartGame();
   });
 
   Usion.game.onStateUpdate((data: any) => {
@@ -316,11 +330,8 @@ export function initGame() {
     state.currentTurn = data.current_turn;
     if (data.status) state.status = data.status;
 
-    // Hide waiting overlay when backend says game is active
-    if (state.status === 'playing') {
-      elements.waitingOverlay.classList.add('hidden');
-      updatePlayerInfo();
-    }
+    // Start game if conditions are met
+    tryStartGame();
 
     const winResult = findWinner(state.board);
     if (winResult) state.winningCells = winResult.cells;
