@@ -252,9 +252,8 @@ export function initGame() {
       updateBoard();
       updateGameStatus();
 
-      if (state.playerIds.length >= 2) {
+      if (state.status === 'playing' && state.playerIds.length >= 2) {
         elements.waitingOverlay.classList.add('hidden');
-        if (state.status === 'waiting') state.status = 'playing';
       }
 
       if (state.gameOver) {
@@ -299,8 +298,9 @@ export function initGame() {
     updatePlayerInfo();
 
     if (state.playerIds.length >= 2) {
-      elements.waitingOverlay.classList.add('hidden');
-      if (state.status === 'waiting') state.status = 'playing';
+      if (state.status === 'playing') {
+        elements.waitingOverlay.classList.add('hidden');
+      }
       updateGameStatus();
     }
   });
@@ -316,10 +316,9 @@ export function initGame() {
     state.currentTurn = data.current_turn;
     if (data.status) state.status = data.status;
 
-    // Hide waiting overlay when game becomes active
-    if (state.status === 'playing' || state.playerIds.length >= 2) {
+    // Hide waiting overlay when backend says game is active
+    if (state.status === 'playing') {
       elements.waitingOverlay.classList.add('hidden');
-      if (state.status === 'waiting') state.status = 'playing';
       updatePlayerInfo();
     }
 
@@ -367,10 +366,20 @@ export function initGame() {
   });
 
   Usion.game.onPlayerLeft((data: any) => {
-    if (!state.gameOver && state.status === 'playing') {
+    const hasMovesBeenMade = state.board.some((cell: string) => cell !== '');
+    if (!state.gameOver && state.status === 'playing' && hasMovesBeenMade) {
       state.gameOver = true;
       state.winner = state.playerId;
       showGameOver({ winner_ids: [state.playerId], reason: 'forfeit' });
+    } else if (!state.gameOver && !hasMovesBeenMade) {
+      // Player left before game started — go back to waiting
+      state.status = 'waiting';
+      if (data.player_id) {
+        state.playerIds = state.playerIds.filter((id: string) => id !== data.player_id);
+      }
+      elements.waitingOverlay.classList.remove('hidden');
+      updatePlayerInfo();
+      updateGameStatus();
     }
   });
 
