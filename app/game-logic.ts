@@ -401,6 +401,10 @@ export function initGame() {
 
     if (actionType === 'move' && actionData.index !== undefined) {
       const index = actionData.index;
+
+      // Skip if cell already occupied (own action echoed back from server)
+      if (state.board[index] !== '') return;
+
       // Determine opponent's symbol
       const opponentSymbol = state.playerSymbol === 'X' ? 'O' : 'X';
       state.board[index] = opponentSymbol;
