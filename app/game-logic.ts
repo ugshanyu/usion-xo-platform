@@ -394,6 +394,49 @@ export function initGame() {
     }
   });
 
+  // Handle opponent's moves (Platform mode: backend relays game:action between clients)
+  Usion.game.onAction((data: any) => {
+    const actionType = data.action_type;
+    const actionData = data.action_data || {};
+
+    if (actionType === 'move' && actionData.index !== undefined) {
+      const index = actionData.index;
+      // Determine opponent's symbol
+      const opponentSymbol = state.playerSymbol === 'X' ? 'O' : 'X';
+      state.board[index] = opponentSymbol;
+
+      // Switch turn to current player
+      state.currentTurn = state.playerId;
+
+      // Check for win
+      const winResult = findWinner(state.board);
+      if (winResult) {
+        state.winningCells = winResult.cells;
+        state.gameOver = true;
+        state.winner = winResult.symbol === state.playerSymbol ? state.playerId
+          : state.playerIds.find((id: string) => id !== state.playerId) || null;
+        updateBoard();
+        showGameOver({
+          winner_ids: state.winner ? [state.winner] : [],
+          is_draw: false,
+        });
+        return;
+      }
+
+      // Check for draw
+      if (state.board.every((cell: string) => cell !== '')) {
+        state.gameOver = true;
+        state.winner = null;
+        updateBoard();
+        showGameOver({ winner_ids: [], is_draw: true });
+        return;
+      }
+
+      updateBoard();
+      updateGameStatus();
+    }
+  });
+
   Usion.game.onError((data: any) => {
     state.isProcessing = false;
     showError(data.message || 'An error occurred', 3000);
@@ -428,6 +471,31 @@ export function initGame() {
 
       Usion.game.action('move', { index }).then(() => {
         state.isProcessing = false;
+        // Switch turn to opponent after successful action
+        const opponentId = state.playerIds.find((id: string) => id !== state.playerId);
+        if (opponentId) state.currentTurn = opponentId;
+
+        // Check for win after own move
+        const winResult = findWinner(state.board);
+        if (winResult) {
+          state.winningCells = winResult.cells;
+          state.gameOver = true;
+          state.winner = state.playerId;
+          updateBoard();
+          showGameOver({ winner_ids: [state.playerId!], is_draw: false });
+          return;
+        }
+        // Check for draw
+        if (state.board.every((cell: string) => cell !== '')) {
+          state.gameOver = true;
+          state.winner = null;
+          updateBoard();
+          showGameOver({ winner_ids: [], is_draw: true });
+          return;
+        }
+
+        updateBoard();
+        updateGameStatus();
       }).catch((err: any) => {
         state.isProcessing = false;
         state.board[index] = '';
