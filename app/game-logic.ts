@@ -72,6 +72,7 @@ export function initGame() {
     winner: null as string | null,
     winningCells: [] as number[],
     isProcessing: false,
+    connectedCount: 0,
     rematchRequested: false,
     opponentWantsRematch: false,
     _exitedPlayerHadTurn: false,
@@ -233,7 +234,7 @@ export function initGame() {
   // Transition from waiting/waiting_rejoin → playing when conditions are met
   function tryStartGame() {
     if (state.gameOver) return;
-    if (state.playerIds.length < 2) return;
+    if (state.connectedCount < 2) return;
 
     const wasWaitingRejoin = state.status === 'waiting_rejoin';
 
@@ -292,6 +293,7 @@ export function initGame() {
 
       state.currentTurn = joinData.current_turn;
       state.status = joinData.status || 'waiting';
+      state.connectedCount = joinData.connected_count || 1;
 
       if (joinData.game_over || joinData.status === 'finished') {
         state.gameOver = true;
@@ -341,6 +343,9 @@ export function initGame() {
       state.playerIds.push(data.player.id);
       state.players.push(data.player);
     }
+
+    // A real player socket-joined — increment connected count
+    state.connectedCount = Math.max(state.connectedCount, state.playerIds.length);
 
     if (state.playerIds.length > 0 && !state.playerSymbol) {
       state.playerSymbol = state.playerIds[0] === state.playerId ? 'X' : 'O';
@@ -426,6 +431,8 @@ export function initGame() {
 
   Usion.game.onPlayerLeft((data: any) => {
     if (state.gameOver) return;
+
+    state.connectedCount = Math.max(0, state.connectedCount - 1);
 
     // Track whether the exited player had the turn (before removing them)
     const exitedPlayerHadTurn = data.player_id && state.currentTurn === data.player_id;
